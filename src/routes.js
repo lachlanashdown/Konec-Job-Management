@@ -108,6 +108,22 @@ function buildApiRouter() {
     res.status(204).end();
   }));
 
+  // ---- Hours attended ----
+  router.post('/projects/:id/hours', wrap((req, res) => {
+    const entry = store.addHoursEntry(req.params.id, req.body || {});
+    res.status(201).json(entry);
+  }));
+
+  router.patch('/projects/:id/hours/:entryId', wrap((req, res) => {
+    const entry = store.updateHoursEntry(req.params.id, req.params.entryId, req.body || {});
+    res.json(entry);
+  }));
+
+  router.delete('/projects/:id/hours/:entryId', wrap((req, res) => {
+    store.deleteHoursEntry(req.params.id, req.params.entryId);
+    res.status(204).end();
+  }));
+
   // ---- Files ----
   router.post('/projects/:id/files', wrap((req, res, next) => {
     upload.array('files', 20)(req, res, (err) => {

@@ -6,6 +6,10 @@ const checklistEl = document.getElementById('checklist');
 const notesListEl = document.getElementById('notesList');
 const projectNameInput = document.getElementById('projectNameInput');
 const commissionDateInput = document.getElementById('commissionDateInput');
+const hoursListEl = document.getElementById('hoursList');
+const hoursTotalEl = document.getElementById('hoursTotal');
+const hoursDateInput = document.getElementById('hoursDateInput');
+const hoursValueInput = document.getElementById('hoursValueInput');
 
 const FILE_SECTIONS = [
   { category: 'general', listEl: document.getElementById('fileList'), dropzoneEl: document.getElementById('dropzone'), inputEl: document.getElementById('fileInput') },
@@ -26,6 +30,7 @@ async function loadProject() {
   projectNameInput.value = project.name;
   commissionDateInput.value = project.commissionDate || '';
   renderChecklist();
+  renderHours();
   renderNotes();
   renderFiles();
 }
@@ -65,6 +70,11 @@ function checklistItemTemplate(field, item) {
         <option value="false" ${item.value === true ? '' : 'selected'}>No</option>
         <option value="true" ${item.value === true ? 'selected' : ''}>Yes</option>
       </select>`;
+  } else if (field.type === 'select') {
+    const options = ['', ...field.options]
+      .map((opt) => `<option value="${escapeHtml(opt)}" ${item.value === opt ? 'selected' : ''}>${opt ? escapeHtml(opt) : 'Select…'}</option>`)
+      .join('');
+    valueControl = `<select data-role="value">${options}</select>`;
   } else if (field.type === 'currency') {
     valueControl = `<input type="number" step="0.01" data-role="value" value="${escapeHtml(item.value)}" placeholder="0.00" />`;
   } else {
@@ -133,6 +143,50 @@ checklistEl.addEventListener('input', (e) => {
   if (!itemEl) return;
   if (e.target.dataset.role === 'note' || (e.target.dataset.role === 'value' && e.target.tagName === 'INPUT')) {
     debounce(`checklist-${itemEl.dataset.key}`, () => saveChecklistItem(itemEl));
+  }
+});
+
+// ---------- Hours attended ----------
+
+function hoursRowTemplate(entry) {
+  return `
+    <div class="file-row" data-id="${entry.id}">
+      <span class="file-name">${formatDate(entry.date)}</span>
+      <span class="file-size">${entry.hours} hrs</span>
+      <button class="btn btn-sm btn-danger" data-action="delete-hours">Delete</button>
+    </div>
+  `;
+}
+
+function renderHours() {
+  const total = project.hoursLog.reduce((sum, entry) => sum + entry.hours, 0);
+  hoursTotalEl.textContent = `Total: ${Math.round(total * 100) / 100} hrs`;
+  hoursListEl.innerHTML = project.hoursLog.length
+    ? project.hoursLog.map(hoursRowTemplate).join('')
+    : '<div class="empty-state">No hours logged yet.</div>';
+}
+
+document.getElementById('addHoursBtn').addEventListener('click', async () => {
+  const date = hoursDateInput.value;
+  const hours = hoursValueInput.value;
+  if (!date || !hours) return;
+  await apiFetch(`api/projects/${projectId}/hours`, {
+    method: 'POST',
+    body: JSON.stringify({ date, hours: Number(hours) }),
+  });
+  hoursDateInput.value = '';
+  hoursValueInput.value = '';
+  project = await apiFetch(`api/projects/${projectId}`);
+  renderHours();
+});
+
+hoursListEl.addEventListener('click', async (e) => {
+  if (e.target.dataset.action === 'delete-hours') {
+    const rowEl = e.target.closest('.file-row');
+    if (!confirm('Delete this day\'s hours?')) return;
+    await apiFetch(`api/projects/${projectId}/hours/${rowEl.dataset.id}`, { method: 'DELETE' });
+    project = await apiFetch(`api/projects/${projectId}`);
+    renderHours();
   }
 });
 

@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { defaultChecklist } = require('./fields');
+const { defaultChecklist, CHECKLIST_FIELDS } = require('./fields');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -16,11 +16,38 @@ function ensureDirs() {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
+// Backfills projects saved before a field/section existed (e.g. new
+// checklist items, the hours log) so old data keeps working without a
+// separate migration step.
+function migrateProject(project) {
+  let changed = false;
+  if (!project.hoursLog) {
+    project.hoursLog = [];
+    changed = true;
+  }
+  for (const field of CHECKLIST_FIELDS) {
+    if (!project.checklist[field.key]) {
+      project.checklist[field.key] = {
+        value: field.type === 'boolean' ? false : '',
+        checked: false,
+        note: '',
+      };
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function load() {
   ensureDirs();
   if (fs.existsSync(DB_FILE)) {
     const raw = fs.readFileSync(DB_FILE, 'utf8');
     db = raw.trim() ? JSON.parse(raw) : { projects: {} };
+    let changed = false;
+    for (const project of Object.values(db.projects)) {
+      if (migrateProject(project)) changed = true;
+    }
+    if (changed) persist();
   } else {
     db = { projects: {} };
     persist();
@@ -75,6 +102,7 @@ function createProject({ name, commissionDate }) {
     checklist: defaultChecklist(),
     notes: [],
     files: [],
+    hoursLog: [],
   };
   db.projects[id] = project;
   fs.mkdirSync(projectUploadsDir(id), { recursive: true });
@@ -150,6 +178,46 @@ function deleteNote(projectId, noteId) {
   persist();
 }
 
+function addHoursEntry(projectId, { date, hours }) {
+  const project = assertProject(projectId);
+  const entry = {
+    id: newId(),
+    date: date || null,
+    hours: Number(hours) || 0,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  project.hoursLog.push(entry);
+  project.hoursLog.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  project.updatedAt = nowIso();
+  persist();
+  return entry;
+}
+
+function updateHoursEntry(projectId, entryId, { date, hours }) {
+  const project = assertProject(projectId);
+  const entry = project.hoursLog.find((h) => h.id === entryId);
+  if (!entry) {
+    const err = new Error('Hours entry not found');
+    err.status = 404;
+    throw err;
+  }
+  if (date !== undefined) entry.date = date || null;
+  if (hours !== undefined) entry.hours = Number(hours) || 0;
+  entry.updatedAt = nowIso();
+  project.hoursLog.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  project.updatedAt = nowIso();
+  persist();
+  return entry;
+}
+
+function deleteHoursEntry(projectId, entryId) {
+  const project = assertProject(projectId);
+  project.hoursLog = project.hoursLog.filter((h) => h.id !== entryId);
+  project.updatedAt = nowIso();
+  persist();
+}
+
 function addFile(projectId, fileMeta) {
   const project = assertProject(projectId);
   const file = {
@@ -205,6 +273,9 @@ module.exports = {
   addNote,
   updateNote,
   deleteNote,
+  addHoursEntry,
+  updateHoursEntry,
+  deleteHoursEntry,
   addFile,
   getFile,
   deleteFile,
