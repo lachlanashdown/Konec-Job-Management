@@ -1,0 +1,22 @@
+services:
+  konec-pm:
+    build: .
+    image: konec-pm:latest
+    container_name: konec-pm
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - APP_PASSWORD=${APP_PASSWORD:-changeme}
+      - SESSION_SECRET=${SESSION_SECRET:?Set SESSION_SECRET in your .env file — a long random string}
+      - PORT=80
+      # Served over HTTPS via the konec-showroom reverse proxy, so cookies are HTTPS-only by default.
+      # Set to "false" if you're hitting the container directly over plain HTTP (e.g. local testing).
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
+      # Only needed if this container is reverse-proxied at a sub-path (e.g. by
+      # the Konec Showroom platform, which injects this automatically at deploy
+      # time — its own `docker run` bypasses this compose file entirely). Leave
+      # unset for a root-mounted deployment.
+      - BASE_PATH=${BASE_PATH:-}
+    volumes:
+      - ./data:/app/data

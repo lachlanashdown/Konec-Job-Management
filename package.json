@@ -1,0 +1,19 @@
+{
+  "name": "konec-pm",
+  "version": "1.0.0",
+  "description": "Konec Project Management System",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cookie-session": "^2.1.0",
+    "express": "^4.19.2",
+    "multer": "^2.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
