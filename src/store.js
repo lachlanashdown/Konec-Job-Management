@@ -25,6 +25,10 @@ function migrateProject(project) {
     project.hoursLog = [];
     changed = true;
   }
+  if (project.konecLinkId === undefined) {
+    project.konecLinkId = null;
+    changed = true;
+  }
   for (const field of CHECKLIST_FIELDS) {
     if (!project.checklist[field.key]) {
       project.checklist[field.key] = {
@@ -91,12 +95,13 @@ function getProject(id) {
   return assertProject(id);
 }
 
-function createProject({ name, commissionDate }) {
+function createProject({ name, commissionDate, konecLinkId }) {
   const id = newId();
   const project = {
     id,
     name: (name || '').trim() || 'Untitled Project',
     commissionDate: commissionDate || null,
+    konecLinkId: (konecLinkId || '').trim() || null,
     createdAt: nowIso(),
     updatedAt: nowIso(),
     checklist: defaultChecklist(),
@@ -117,6 +122,9 @@ function updateProject(id, patch) {
   }
   if ('commissionDate' in patch) {
     project.commissionDate = patch.commissionDate || null;
+  }
+  if ('konecLinkId' in patch) {
+    project.konecLinkId = (patch.konecLinkId || '').trim() || null;
   }
   project.updatedAt = nowIso();
   persist();

@@ -14,7 +14,11 @@ async function loadProjects() {
 function render() {
   const query = searchInput.value.trim().toLowerCase();
   const filtered = query
-    ? allProjects.filter((p) => p.name.toLowerCase().includes(query))
+    ? allProjects.filter(
+        (p) =>
+          p.name.toLowerCase().includes(query) ||
+          (p.konecLinkId || '').toLowerCase().includes(query)
+      )
     : allProjects;
 
   grid.innerHTML = '';
@@ -46,6 +50,10 @@ function render() {
       <div class="meta-row">
         <span>Commission date</span>
         <span>${formatDate(project.commissionDate)}</span>
+      </div>
+      <div class="meta-row">
+        <span>Konec Link ID</span>
+        <span>${project.konecLinkId ? escapeHtml(project.konecLinkId) : '—'}</span>
       </div>
       <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
       <div class="meta-row">
@@ -81,9 +89,10 @@ newProjectForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = document.getElementById('projectName').value;
   const commissionDate = document.getElementById('projectCommissionDate').value || null;
+  const konecLinkId = document.getElementById('projectKonecLinkId').value || null;
   const project = await apiFetch('api/projects', {
     method: 'POST',
-    body: JSON.stringify({ name, commissionDate }),
+    body: JSON.stringify({ name, commissionDate, konecLinkId }),
   });
   window.location.href = `project/${project.id}`;
 });

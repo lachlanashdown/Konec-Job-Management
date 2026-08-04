@@ -24,6 +24,7 @@ function projectSummary(project) {
     id: project.id,
     name: project.name,
     commissionDate: project.commissionDate,
+    konecLinkId: project.konecLinkId,
     price: project.checklist.totalJobCost ? project.checklist.totalJobCost.value : '',
     checklistDone: Object.values(project.checklist).filter((i) => i.checked).length,
     checklistTotal: Object.keys(project.checklist).length,
@@ -63,8 +64,8 @@ function buildApiRouter() {
   }));
 
   router.post('/projects', wrap((req, res) => {
-    const { name, commissionDate } = req.body || {};
-    const project = store.createProject({ name, commissionDate });
+    const { name, commissionDate, konecLinkId } = req.body || {};
+    const project = store.createProject({ name, commissionDate, konecLinkId });
     res.status(201).json(project);
   }));
 

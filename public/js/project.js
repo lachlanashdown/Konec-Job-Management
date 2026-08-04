@@ -6,6 +6,7 @@ const checklistEl = document.getElementById('checklist');
 const notesListEl = document.getElementById('notesList');
 const projectNameInput = document.getElementById('projectNameInput');
 const commissionDateInput = document.getElementById('commissionDateInput');
+const konecLinkIdInput = document.getElementById('konecLinkIdInput');
 const hoursListEl = document.getElementById('hoursList');
 const hoursTotalEl = document.getElementById('hoursTotal');
 const hoursDateInput = document.getElementById('hoursDateInput');
@@ -29,6 +30,7 @@ async function loadProject() {
   document.title = `${project.name} — Konec Project Management`;
   projectNameInput.value = project.name;
   commissionDateInput.value = project.commissionDate || '';
+  konecLinkIdInput.value = project.konecLinkId || '';
   renderChecklist();
   renderHours();
   renderNotes();
@@ -50,6 +52,15 @@ commissionDateInput.addEventListener('change', async () => {
   project = await apiFetch(`api/projects/${projectId}`, {
     method: 'PATCH',
     body: JSON.stringify({ commissionDate: commissionDateInput.value || null }),
+  });
+});
+
+konecLinkIdInput.addEventListener('input', () => {
+  debounce('konecLinkId', async () => {
+    project = await apiFetch(`api/projects/${projectId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ konecLinkId: konecLinkIdInput.value || null }),
+    });
   });
 });
 
