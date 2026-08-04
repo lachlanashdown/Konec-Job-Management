@@ -19,4 +19,4 @@ services:
       # unset for a root-mounted deployment.
       - BASE_PATH=${BASE_PATH:-}
     volumes:
-      - ./data:/app/data
+      - ./data:/data

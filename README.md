@@ -61,7 +61,7 @@ docker run -d \
   -e APP_PASSWORD=Konec3133 \
   -e SESSION_SECRET=$(openssl rand -hex 32) \
   -e COOKIE_SECURE=true \
-  -v /srv/konec-pm/data:/app/data \
+  -v /srv/konec-pm/data:/data \
   --restart unless-stopped \
   konec-pm:latest
 ```
@@ -136,9 +136,9 @@ will do in production.
 
 - **Image**: `ghcr.io/<your-username>/<repo-name>:latest`
 - **Container port**: `80`
-- **Env vars**: `APP_PASSWORD`, `SESSION_SECRET` (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`), `COOKIE_SECURE=true`
+- **Data mount path**: `/data` — the platform mounts a persistent Docker volume here (per the guide's §2.4 data-persistence support), so `db.json` and all uploaded files survive service updates, restarts, and stop/start. The app creates its own subdirectories under this path automatically the first time it starts against an empty volume — no manual init needed. **Set this in the platform UI or nothing is persisted.**
+- **Env vars** (paste into the Service page's `.env` editor): `APP_PASSWORD`, `SESSION_SECRET` (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`), `COOKIE_SECURE=true`
 - **Resource limits**: fits comfortably within the platform's 512MB/1.0 CPU defaults
-- ⚠️ **Storage is ephemeral**: the platform does `docker rm -f` + re-run on every redeploy, and this app stores `data/db.json` and uploaded files on the container's local filesystem. **Unless the platform lets you mount a persistent volume for `/app/data`, all projects/checklists/notes/files will be wiped on every redeploy.** If persistent volumes aren't available on this platform, ask the operator about that before relying on this for real jobs — it's the one hard requirement in the guide (§2.4) this app doesn't control on its own.
 
 ## Notes on the checklist fields
 

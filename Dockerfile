@@ -10,11 +10,13 @@ COPY src ./src
 COPY public ./public
 
 ENV NODE_ENV=production
-ENV DATA_DIR=/app/data
+ENV DATA_DIR=/data
 ENV PORT=80
 
-# Persisted outside the image: db.json + uploaded files.
-VOLUME ["/app/data"]
+# /data is the Konec Showroom platform's documented data-mount-path
+# convention — the operator mounts a persistent volume here so db.json and
+# uploaded files survive service updates/restarts (see service-image-guide §2.4).
+VOLUME ["/data"]
 
 EXPOSE 80
 
