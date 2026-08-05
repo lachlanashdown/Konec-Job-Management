@@ -9,6 +9,7 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
+    "adm-zip": "^0.6.0",
     "cookie-session": "^2.1.0",
     "express": "^4.19.2",
     "multer": "^2.0.1"

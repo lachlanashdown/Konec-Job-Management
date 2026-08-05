@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const AdmZip = require('adm-zip');
 const { defaultChecklist, CHECKLIST_FIELDS } = require('./fields');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -268,10 +269,55 @@ function deleteFile(projectId, fileId) {
   return file;
 }
 
+// ---- Backup / restore ----
+// Manual safety net: everything under DATA_DIR (db.json + all uploaded
+// files) as a single zip, so data can be snapshotted/restored independently
+// of whatever persistence the hosting platform does or doesn't provide.
+
+function exportBackupBuffer() {
+  const zip = new AdmZip();
+  zip.addLocalFile(DB_FILE);
+  if (fs.existsSync(UPLOADS_DIR)) {
+    zip.addLocalFolder(UPLOADS_DIR, 'uploads');
+  }
+  return zip.toBuffer();
+}
+
+function restoreFromBackupBuffer(buffer) {
+  const zip = new AdmZip(buffer);
+  const dbEntry = zip.getEntry('db.json');
+  if (!dbEntry) {
+    const err = new Error('That file doesn\'t look like a Konec PM backup (missing db.json).');
+    err.status = 400;
+    throw err;
+  }
+  // Validate before touching anything on disk.
+  let parsed;
+  try {
+    parsed = JSON.parse(zip.readAsText(dbEntry));
+  } catch (e) {
+    const err = new Error('Backup db.json is not valid JSON — refusing to restore.');
+    err.status = 400;
+    throw err;
+  }
+  if (!parsed || typeof parsed !== 'object' || typeof parsed.projects !== 'object') {
+    const err = new Error('Backup db.json has an unexpected shape — refusing to restore.');
+    err.status = 400;
+    throw err;
+  }
+
+  fs.rmSync(UPLOADS_DIR, { recursive: true, force: true });
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  zip.extractAllTo(DATA_DIR, true);
+  load();
+}
+
 module.exports = {
   DATA_DIR,
   UPLOADS_DIR,
   load,
+  exportBackupBuffer,
+  restoreFromBackupBuffer,
   listProjects,
   getProject,
   createProject,

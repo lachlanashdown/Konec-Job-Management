@@ -54,9 +54,31 @@ const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024, files: 20 }, // 200MB per file, 20 files per request
 });
 
+const restoreUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB backup zip
+});
+
 function buildApiRouter() {
   const router = express.Router();
   router.use(express.json());
+
+  // ---- Backup / restore ----
+  router.get('/backup', wrap((req, res) => {
+    const buffer = store.exportBackupBuffer();
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="konec-pm-backup-${stamp}.zip"`);
+    res.send(buffer);
+  }));
+
+  router.post('/backup/restore', restoreUpload.single('backup'), wrap((req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No backup file provided' });
+    }
+    store.restoreFromBackupBuffer(req.file.buffer);
+    res.json({ ok: true });
+  }));
 
   // ---- Projects ----
   router.get('/projects', wrap((req, res) => {

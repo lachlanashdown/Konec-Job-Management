@@ -13,8 +13,11 @@
       <span class="brand-sub">Project Management</span>
     </div>
     <div class="topbar-actions">
+      <a href="api/backup" class="btn btn-sm btn-backup" download>Download Backup</a>
+      <button id="restoreBackupBtn" class="btn btn-sm btn-backup">Restore Backup</button>
+      <input type="file" id="restoreFileInput" accept=".zip" class="hidden" />
       <form method="POST" action="logout">
-        <button type="submit" class="btn btn-sm">Log out</button>
+        <button type="submit" class="btn btn-sm btn-outline-backup">Log out</button>
       </form>
     </div>
   </header>

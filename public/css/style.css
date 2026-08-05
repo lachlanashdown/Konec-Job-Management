@@ -6,9 +6,11 @@
   --border: #2e2e33;
   --text: #f2f2f0;
   --text-muted: #9a9aa2;
-  --accent: #ffca28;
-  --accent-dark: #e0ab00;
+  --accent: #ffd400;
+  --accent-dark: #e0bb00;
   --accent-text: #1a1400;
+  --backup-color: rgba(191, 159, 0, 0.6);
+  --backup-color-solid: #bf9f00;
   --danger: #ff5c5c;
   --success: #4ade80;
   --radius: 10px;
@@ -62,9 +64,9 @@ a:hover {
 }
 
 .brand-logo {
-  height: 32px;
+  height: 48px;
   width: auto;
-  max-width: 220px;
+  max-width: 330px;
   display: block;
   object-fit: contain;
 }
@@ -149,6 +151,31 @@ main.container {
 .btn-accent:hover {
   background: var(--accent-dark);
   border-color: var(--accent-dark);
+}
+
+.btn-backup {
+  background: var(--backup-color);
+  color: var(--accent-text);
+  border-color: var(--backup-color);
+  font-weight: 600;
+}
+
+.btn-backup:hover {
+  background: var(--backup-color-solid);
+  border-color: var(--backup-color-solid);
+}
+
+.btn-outline-backup {
+  background: transparent;
+  color: var(--backup-color);
+  border-color: var(--backup-color);
+  font-weight: 600;
+}
+
+.btn-outline-backup:hover {
+  background: rgba(255, 230, 107, 0.12);
+  color: var(--backup-color-solid);
+  border-color: var(--backup-color-solid);
 }
 
 .btn-danger {
