@@ -4,9 +4,10 @@ const crypto = require('crypto');
 const express = require('express');
 const multer = require('multer');
 const store = require('./store');
-const { CHECKLIST_FIELDS } = require('./fields');
+const { CHECKLIST_FIELDS, COMMISSIONING_FIELDS } = require('./fields');
 
 const CHECKLIST_KEYS = new Set(CHECKLIST_FIELDS.map((f) => f.key));
+const COMMISSIONING_KEYS = new Set(COMMISSIONING_FIELDS.map((f) => f.key));
 
 function wrap(fn) {
   return (req, res, next) => {
@@ -28,6 +29,12 @@ function projectSummary(project) {
     price: project.checklist.totalJobCost ? project.checklist.totalJobCost.value : '',
     checklistDone: Object.values(project.checklist).filter((i) => i.checked).length,
     checklistTotal: Object.keys(project.checklist).length,
+    // Commissioning items are "done" once marked Yes or N/A — there's no
+    // separate confirmed checkbox, the status itself is the completion state.
+    commissioningDone: Object.values(project.commissioningChecklist).filter(
+      (i) => i.value === 'Yes' || i.value === 'N/A'
+    ).length,
+    commissioningTotal: Object.keys(project.commissioningChecklist).length,
     fileCount: project.files.length,
     updatedAt: project.updatedAt,
     createdAt: project.createdAt,
@@ -112,6 +119,16 @@ function buildApiRouter() {
       return res.status(400).json({ error: 'Unknown checklist field' });
     }
     const project = store.updateChecklistItem(req.params.id, key, req.body || {});
+    res.json(project);
+  }));
+
+  // ---- Commissioning checklist ----
+  router.patch('/projects/:id/commissioning/:key', wrap((req, res) => {
+    const { key } = req.params;
+    if (!COMMISSIONING_KEYS.has(key)) {
+      return res.status(400).json({ error: 'Unknown commissioning field' });
+    }
+    const project = store.updateCommissioningItem(req.params.id, key, req.body || {});
     res.json(project);
   }));
 

@@ -44,6 +44,9 @@ function render() {
     const pct = project.checklistTotal
       ? Math.round((project.checklistDone / project.checklistTotal) * 100)
       : 0;
+    const commissioningPct = project.commissioningTotal
+      ? Math.round((project.commissioningDone / project.commissioningTotal) * 100)
+      : 0;
     card.innerHTML = `
       <h3>${escapeHtml(project.name)}</h3>
       <div class="price">${formatCurrency(project.price)}</div>
@@ -57,8 +60,13 @@ function render() {
       </div>
       <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
       <div class="meta-row">
-        <span>Checklist</span>
+        <span>Pre-Site Visit</span>
         <span>${project.checklistDone}/${project.checklistTotal} complete</span>
+      </div>
+      <div class="progress-bar"><div class="progress-bar-fill" style="width:${commissioningPct}%"></div></div>
+      <div class="meta-row">
+        <span>Commissioning</span>
+        <span>${project.commissioningDone}/${project.commissioningTotal} complete</span>
       </div>
       <div class="meta-row">
         <span>Files</span>

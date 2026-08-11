@@ -4,7 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const AdmZip = require('adm-zip');
-const { defaultChecklist, CHECKLIST_FIELDS } = require('./fields');
+const {
+  defaultChecklist,
+  defaultCommissioningChecklist,
+  CHECKLIST_FIELDS,
+  COMMISSIONING_FIELDS,
+} = require('./fields');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -37,6 +42,16 @@ function migrateProject(project) {
         checked: false,
         note: '',
       };
+      changed = true;
+    }
+  }
+  if (!project.commissioningChecklist) {
+    project.commissioningChecklist = defaultCommissioningChecklist();
+    changed = true;
+  }
+  for (const field of COMMISSIONING_FIELDS) {
+    if (!project.commissioningChecklist[field.key]) {
+      project.commissioningChecklist[field.key] = { value: '', checked: false, note: '' };
       changed = true;
     }
   }
@@ -106,6 +121,7 @@ function createProject({ name, commissionDate, konecLinkId }) {
     createdAt: nowIso(),
     updatedAt: nowIso(),
     checklist: defaultChecklist(),
+    commissioningChecklist: defaultCommissioningChecklist(),
     notes: [],
     files: [],
     hoursLog: [],
@@ -140,9 +156,9 @@ function deleteProject(id) {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
-function updateChecklistItem(projectId, key, patch) {
+function updateItemIn(listName, projectId, key, patch) {
   const project = assertProject(projectId);
-  const item = project.checklist[key];
+  const item = project[listName][key];
   if (!item) {
     const err = new Error('Unknown checklist field');
     err.status = 400;
@@ -154,6 +170,14 @@ function updateChecklistItem(projectId, key, patch) {
   project.updatedAt = nowIso();
   persist();
   return project;
+}
+
+function updateChecklistItem(projectId, key, patch) {
+  return updateItemIn('checklist', projectId, key, patch);
+}
+
+function updateCommissioningItem(projectId, key, patch) {
+  return updateItemIn('commissioningChecklist', projectId, key, patch);
 }
 
 function addNote(projectId, content) {
@@ -324,6 +348,7 @@ module.exports = {
   updateProject,
   deleteProject,
   updateChecklistItem,
+  updateCommissioningItem,
   addNote,
   updateNote,
   deleteNote,

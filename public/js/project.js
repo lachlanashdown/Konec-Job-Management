@@ -2,7 +2,19 @@
 // of how many prefix segments (e.g. a platform BASE_PATH) precede it.
 const projectId = window.location.pathname.split('/').filter(Boolean).pop();
 
+// ---------- Collapsible sections ----------
+document.querySelectorAll('.section-head[data-toggle="collapse"]').forEach((head) => {
+  head.addEventListener('click', () => {
+    head.closest('.section').classList.toggle('collapsed');
+  });
+});
+
 const checklistEl = document.getElementById('checklist');
+const checklistProgressText = document.getElementById('checklistProgressText');
+const checklistProgressFill = document.getElementById('checklistProgressFill');
+const commissioningChecklistEl = document.getElementById('commissioningChecklist');
+const commissioningProgressText = document.getElementById('commissioningProgressText');
+const commissioningProgressFill = document.getElementById('commissioningProgressFill');
 const notesListEl = document.getElementById('notesList');
 const projectNameInput = document.getElementById('projectNameInput');
 const commissionDateInput = document.getElementById('commissionDateInput');
@@ -32,6 +44,7 @@ async function loadProject() {
   commissionDateInput.value = project.commissionDate || '';
   konecLinkIdInput.value = project.konecLinkId || '';
   renderChecklist();
+  renderCommissioning();
   renderHours();
   renderNotes();
   renderFiles();
@@ -107,10 +120,19 @@ function checklistItemTemplate(field, item) {
   `;
 }
 
+function updateChecklistProgress() {
+  const done = CHECKLIST_FIELDS.filter((f) => project.checklist[f.key].checked).length;
+  const total = CHECKLIST_FIELDS.length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  checklistProgressText.textContent = `${done}/${total} complete`;
+  checklistProgressFill.style.width = `${pct}%`;
+}
+
 function renderChecklist() {
   checklistEl.innerHTML = CHECKLIST_FIELDS.map((field) =>
     checklistItemTemplate(field, project.checklist[field.key])
   ).join('');
+  updateChecklistProgress();
 }
 
 function showHint(itemEl) {
@@ -138,6 +160,7 @@ async function saveChecklistItem(itemEl) {
   });
   project = updatedProject;
   itemEl.classList.toggle('is-checked', checked);
+  updateChecklistProgress();
   showHint(itemEl);
 }
 
@@ -154,6 +177,80 @@ checklistEl.addEventListener('input', (e) => {
   if (!itemEl) return;
   if (e.target.dataset.role === 'note' || (e.target.dataset.role === 'value' && e.target.tagName === 'INPUT')) {
     debounce(`checklist-${itemEl.dataset.key}`, () => saveChecklistItem(itemEl));
+  }
+});
+
+// ---------- Commissioning checklist ----------
+// A separate checklist (own data, own progress bar) from the Pre-Site Visit
+// one above — each item is just a Yes/No(/N/A) status plus a note, so there's
+// no separate "confirmed" checkbox: the status itself is the completion state.
+
+function commissioningItemTemplate(field, item) {
+  const isDone = item.value === 'Yes' || item.value === 'N/A';
+  const options = ['', ...field.options]
+    .map((opt) => `<option value="${escapeHtml(opt)}" ${item.value === opt ? 'selected' : ''}>${opt ? escapeHtml(opt) : 'Select…'}</option>`)
+    .join('');
+
+  return `
+    <div class="checklist-item ${isDone ? 'is-checked' : ''}" data-key="${field.key}">
+      <div class="checklist-item-head">
+        <span class="label">${escapeHtml(field.label)}</span>
+        <span class="save-hint" data-role="hint"></span>
+      </div>
+      <div class="checklist-item-body">
+        <select data-role="value">${options}</select>
+        <textarea class="note-field" data-role="note" rows="2" placeholder="Note…">${escapeHtml(item.note)}</textarea>
+      </div>
+    </div>
+  `;
+}
+
+function updateCommissioningProgress() {
+  const done = COMMISSIONING_FIELDS.filter((f) => {
+    const value = project.commissioningChecklist[f.key].value;
+    return value === 'Yes' || value === 'N/A';
+  }).length;
+  const total = COMMISSIONING_FIELDS.length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  commissioningProgressText.textContent = `${done}/${total} complete`;
+  commissioningProgressFill.style.width = `${pct}%`;
+}
+
+function renderCommissioning() {
+  commissioningChecklistEl.innerHTML = COMMISSIONING_FIELDS.map((field) =>
+    commissioningItemTemplate(field, project.commissioningChecklist[field.key])
+  ).join('');
+  updateCommissioningProgress();
+}
+
+async function saveCommissioningItem(itemEl) {
+  const key = itemEl.dataset.key;
+  const noteVal = itemEl.querySelector('[data-role="note"]').value;
+  const value = itemEl.querySelector('[data-role="value"]').value;
+
+  const updatedProject = await apiFetch(`api/projects/${projectId}/commissioning/${key}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ value, note: noteVal }),
+  });
+  project = updatedProject;
+  itemEl.classList.toggle('is-checked', value === 'Yes' || value === 'N/A');
+  updateCommissioningProgress();
+  showHint(itemEl);
+}
+
+commissioningChecklistEl.addEventListener('change', (e) => {
+  const itemEl = e.target.closest('.checklist-item');
+  if (!itemEl) return;
+  if (e.target.dataset.role === 'value') {
+    saveCommissioningItem(itemEl);
+  }
+});
+
+commissioningChecklistEl.addEventListener('input', (e) => {
+  const itemEl = e.target.closest('.checklist-item');
+  if (!itemEl) return;
+  if (e.target.dataset.role === 'note') {
+    debounce(`commissioning-${itemEl.dataset.key}`, () => saveCommissioningItem(itemEl));
   }
 });
 

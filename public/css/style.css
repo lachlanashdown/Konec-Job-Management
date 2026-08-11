@@ -478,7 +478,7 @@ label {
 }
 
 .section h2 {
-  margin: 0 0 16px 0;
+  margin: 0;
   font-size: 16px;
   display: flex;
   align-items: center;
@@ -491,6 +491,44 @@ label {
   border-radius: 50%;
   background: var(--accent);
   display: inline-block;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 16px;
+}
+
+.section-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-progress-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.collapse-caret {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.section.collapsed .collapse-caret {
+  transform: rotate(-90deg);
+}
+
+.section.collapsed .section-body {
+  display: none;
 }
 
 /* ---------- Modal ---------- */
