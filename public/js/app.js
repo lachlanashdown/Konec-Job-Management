@@ -65,7 +65,7 @@ function render() {
       </div>
       <div class="progress-bar"><div class="progress-bar-fill" style="width:${commissioningPct}%"></div></div>
       <div class="meta-row">
-        <span>Commissioning</span>
+        <span>Commissioning (${project.homesCount} home${project.homesCount === 1 ? '' : 's'})</span>
         <span>${project.commissioningDone}/${project.commissioningTotal} complete</span>
       </div>
       <div class="meta-row">

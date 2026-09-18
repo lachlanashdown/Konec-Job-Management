@@ -53,15 +53,112 @@
 
     <section class="section collapsed">
       <div class="section-head" data-toggle="collapse">
-        <h2><span class="accent-dot"></span>Commissioning</h2>
+        <h2><span class="accent-dot"></span>Homes / Units</h2>
         <div class="section-head-right">
-          <span id="commissioningProgressText" class="section-progress-text"></span>
+          <span id="homesSummaryText" class="section-progress-text"></span>
           <span class="collapse-caret">&#9662;</span>
         </div>
       </div>
-      <div class="progress-bar" style="margin:0 0 16px;"><div id="commissioningProgressFill" class="progress-bar-fill" style="width:0%"></div></div>
       <div class="section-body">
-        <div id="commissioningChecklist" class="checklist"></div>
+        <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px;">
+          <div style="flex:1; min-width:200px;">
+            <label for="homeSelect">Select Home/Unit</label>
+            <select id="homeSelect"></select>
+          </div>
+          <button id="renameHomeBtn" class="btn btn-sm">Rename</button>
+          <button id="deleteHomeBtn" class="btn btn-sm btn-danger">Delete</button>
+        </div>
+        <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:20px;">
+          <div style="flex:1; min-width:200px;">
+            <label for="newHomeNameInput">Add Home/Unit</label>
+            <input type="text" id="newHomeNameInput" placeholder="e.g. Unit 3" />
+          </div>
+          <button id="addHomeBtn" class="btn btn-accent btn-sm">+ Add Home/Unit</button>
+        </div>
+
+        <div id="noHomesState" class="empty-state hidden">
+          No homes/units added yet. Add one above to start commissioning.
+        </div>
+
+        <div id="homeContent" class="hidden">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:6px;">
+            <h3 style="margin:0; font-size:15px;">Commissioning Checklist</h3>
+            <span id="homeCommissioningProgressText" class="section-progress-text"></span>
+          </div>
+          <div class="progress-bar" style="margin:10px 0 16px;"><div id="homeCommissioningProgressFill" class="progress-bar-fill" style="width:0%"></div></div>
+          <div id="homeCommissioningChecklist" class="checklist"></div>
+
+          <h3 style="margin:26px 0 10px; font-size:15px;">General Notes</h3>
+          <div class="field">
+            <textarea id="homeNewNoteContent" rows="3" placeholder="Add a note for this home/unit…"></textarea>
+          </div>
+          <button id="addHomeNoteBtn" class="btn btn-accent btn-sm">Add Note</button>
+          <div id="homeNotesList" style="margin-top:16px;"></div>
+
+          <h3 style="margin:26px 0 10px; font-size:15px;">Outstanding Items</h3>
+          <div class="field">
+            <textarea id="newOutstandingContent" rows="2" placeholder="Describe an outstanding item or defect…"></textarea>
+          </div>
+          <button id="addOutstandingBtn" class="btn btn-accent btn-sm">Add Outstanding Item</button>
+          <div id="outstandingList" style="margin-top:16px;"></div>
+
+          <h3 style="margin:26px 0 10px; font-size:15px;">Photos / Plans</h3>
+          <div id="homeDropzone" class="dropzone">
+            Drag &amp; drop photos or floor plans here — or click to browse
+            <input type="file" id="homeFileInput" multiple class="hidden" />
+          </div>
+          <div id="homeFileList" class="file-list" style="margin-top:14px;"></div>
+
+          <h3 style="margin:26px 0 10px; font-size:15px;">Hours Attended (this Home/Unit)</h3>
+          <div class="field" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+            <div style="flex:1; min-width:140px;">
+              <label for="homeHoursDateInput">Date</label>
+              <input type="date" id="homeHoursDateInput" />
+            </div>
+            <div style="flex:1; min-width:100px;">
+              <label for="homeHoursValueInput">Hours</label>
+              <input type="number" id="homeHoursValueInput" step="0.25" min="0" placeholder="0" />
+            </div>
+            <button id="addHomeHoursBtn" class="btn btn-accent btn-sm">Add Day</button>
+          </div>
+          <div id="homeHoursTotal" style="margin:14px 0 4px; font-weight:600; color:var(--accent);"></div>
+          <div id="homeHoursList" class="file-list"></div>
+
+          <h3 style="margin:26px 0 10px; font-size:15px;">Aftersales Tickets</h3>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div class="field" style="margin:0;">
+              <label for="aftersalesProjectRef">Project ID</label>
+              <input type="text" id="aftersalesProjectRef" />
+            </div>
+            <div class="field" style="margin:0;">
+              <label for="aftersalesCaseId">Aftersales Case ID</label>
+              <input type="text" id="aftersalesCaseId" />
+            </div>
+            <div class="field" style="margin:0;">
+              <label for="aftersalesActionDate">Action Date</label>
+              <input type="date" id="aftersalesActionDate" />
+            </div>
+            <div class="field" style="margin:0; grid-column:1 / -1;">
+              <label for="aftersalesIssueNotes">Issue Notes</label>
+              <textarea id="aftersalesIssueNotes" rows="2" placeholder="Describe the aftersales issue…"></textarea>
+            </div>
+          </div>
+          <button id="addAftersalesBtn" class="btn btn-accent btn-sm" style="margin-top:12px;">Add Ticket</button>
+          <div id="aftersalesList" style="margin-top:16px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section collapsed">
+      <div class="section-head" data-toggle="collapse">
+        <h2><span class="accent-dot"></span>Aftersales Overview</h2>
+        <div class="section-head-right">
+          <span id="aftersalesOverviewCount" class="section-progress-text"></span>
+          <span class="collapse-caret">&#9662;</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <div id="aftersalesOverviewList"></div>
       </div>
     </section>
 
@@ -84,6 +181,7 @@
         </div>
         <div id="hoursTotal" style="margin:14px 0 4px; font-weight:600; color:var(--accent);"></div>
         <div id="hoursList" class="file-list"></div>
+        <div id="hoursByHome" style="margin-top:18px;"></div>
       </div>
     </section>
 
