@@ -10,7 +10,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 
-let db = { projects: {} };
+let db = { projects: {}, activityLog: [] };
 
 function ensureDirs() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -36,8 +36,88 @@ function defaultHome(name) {
     outstandingItems: [],
     files: [],
     hoursLog: [],
-    aftersalesTickets: [],
   };
+}
+
+// Appended to whenever something notable happens, so the home page can show
+// "last actioned item" style activity. Capped so db.json doesn't grow forever.
+function logActivity(message, { projectId, projectName, homeId, homeName } = {}) {
+  db.activityLog.unshift({
+    id: newId(),
+    message,
+    projectId: projectId || null,
+    projectName: projectName || null,
+    homeId: homeId || null,
+    homeName: homeName || null,
+    createdAt: nowIso(),
+  });
+  if (db.activityLog.length > 200) db.activityLog.length = 200;
+}
+
+function listRecentActivity(limit = 10) {
+  return db.activityLog.slice(0, limit);
+}
+
+// Converts a ticket from the older shape (issueNotes/actionDate/modelNumber/
+// serialNumber) into the current one, which mirrors the team's real
+// spreadsheet (grouped fields + a repeatable "Date & Action" log rather than
+// a single action date).
+function migrateAftersalesTicket(ticket) {
+  let changed = false;
+  if (!ticket.actions) {
+    ticket.actions = ticket.actionDate ? [{ id: newId(), date: ticket.actionDate, action: '', createdAt: nowIso() }] : [];
+    delete ticket.actionDate;
+    changed = true;
+  }
+  if (ticket.status === undefined) {
+    ticket.status = 'Open';
+    changed = true;
+  }
+  if (ticket.summary === undefined) {
+    ticket.summary = ticket.issueNotes || '';
+    delete ticket.issueNotes;
+    changed = true;
+  }
+  if (ticket.product === undefined) {
+    ticket.product = ticket.modelNumber || '';
+    delete ticket.modelNumber;
+    changed = true;
+  }
+  if (ticket.faultySN === undefined) {
+    ticket.faultySN = ticket.serialNumber || '';
+    delete ticket.serialNumber;
+    changed = true;
+  }
+  if (ticket.charge === undefined) {
+    ticket.charge = null;
+    changed = true;
+  }
+  if (ticket.homeId === undefined) {
+    ticket.homeId = null;
+    changed = true;
+  }
+  for (const field of [
+    'caseId',
+    'handler',
+    'projectRef',
+    'companyName',
+    'contactName',
+    'email',
+    'phone',
+    'address',
+    'propertyType',
+    'issueType',
+    'notes',
+    'findings',
+    'resolution',
+    'replacementSN',
+  ]) {
+    if (ticket[field] === undefined) {
+      ticket[field] = '';
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 // Converts a pre-Homes/Units project's flat commissioningChecklist (Yes/No/N/A
@@ -94,13 +174,23 @@ function migrateProject(project) {
     delete project.commissioningChecklist;
     changed = true;
   }
+  if (!project.aftersalesTickets) {
+    project.aftersalesTickets = [];
+    changed = true;
+  }
   for (const home of project.homes) {
     if (!home.outstandingItems) {
       home.outstandingItems = [];
       changed = true;
     }
-    if (!home.aftersalesTickets) {
-      home.aftersalesTickets = [];
+    // Aftersales tickets used to live on the home; move them up to the
+    // project (with homeId set) so a project's aftersales can be listed and
+    // created without necessarily tying every ticket to one home.
+    if (home.aftersalesTickets) {
+      for (const ticket of home.aftersalesTickets) {
+        project.aftersalesTickets.push({ ...ticket, homeId: home.id });
+      }
+      delete home.aftersalesTickets;
       changed = true;
     }
     if (!home.files) {
@@ -125,6 +215,9 @@ function migrateProject(project) {
       }
     }
   }
+  for (const ticket of project.aftersalesTickets) {
+    if (migrateAftersalesTicket(ticket)) changed = true;
+  }
   return changed;
 }
 
@@ -134,12 +227,16 @@ function load() {
     const raw = fs.readFileSync(DB_FILE, 'utf8');
     db = raw.trim() ? JSON.parse(raw) : { projects: {} };
     let changed = false;
+    if (!db.activityLog) {
+      db.activityLog = [];
+      changed = true;
+    }
     for (const project of Object.values(db.projects)) {
       if (migrateProject(project)) changed = true;
     }
     if (changed) persist();
   } else {
-    db = { projects: {} };
+    db = { projects: {}, activityLog: [] };
     persist();
   }
 }
@@ -214,9 +311,11 @@ function createProject({ name, commissionDate, konecLinkId }) {
     files: [],
     hoursLog: [],
     homes: [],
+    aftersalesTickets: [],
   };
   db.projects[id] = project;
   fs.mkdirSync(projectUploadsDir(id), { recursive: true });
+  logActivity(`Job "${project.name}" created`, { projectId: id, projectName: project.name });
   persist();
   return project;
 }
@@ -253,9 +352,17 @@ function updateChecklistItem(projectId, key, patch) {
     err.status = 400;
     throw err;
   }
+  const wasChecked = item.checked;
   if ('value' in patch) item.value = patch.value;
   if ('checked' in patch) item.checked = !!patch.checked;
   if ('note' in patch) item.note = patch.note;
+  if (!wasChecked && item.checked) {
+    const field = CHECKLIST_FIELDS.find((f) => f.key === key);
+    logActivity(`"${field ? field.label : key}" completed on "${project.name}"`, {
+      projectId: project.id,
+      projectName: project.name,
+    });
+  }
   project.updatedAt = nowIso();
   persist();
   return project;
@@ -309,6 +416,7 @@ function addNote(projectId, content) {
   const project = assertProject(projectId);
   const note = pushNote(project.notes, content);
   project.updatedAt = nowIso();
+  logActivity(`Note added on "${project.name}"`, { projectId: project.id, projectName: project.name });
   persist();
   return note;
 }
@@ -334,6 +442,10 @@ function addHoursEntry(projectId, patch) {
   const project = assertProject(projectId);
   const entry = pushHours(project.hoursLog, patch);
   project.updatedAt = nowIso();
+  logActivity(`Hours logged on "${project.name}" (${entry.hours} hrs)`, {
+    projectId: project.id,
+    projectName: project.name,
+  });
   persist();
   return entry;
 }
@@ -368,6 +480,10 @@ function addFile(projectId, fileMeta) {
   };
   project.files.push(file);
   project.updatedAt = nowIso();
+  logActivity(`File "${file.originalName}" uploaded to "${project.name}"`, {
+    projectId: project.id,
+    projectName: project.name,
+  });
   persist();
   return file;
 }
@@ -405,6 +521,12 @@ function createHome(projectId, { name }) {
   project.homes.push(home);
   project.updatedAt = nowIso();
   fs.mkdirSync(homeFilesDir(projectId, home.id), { recursive: true });
+  logActivity(`Home/Unit "${home.name}" added to "${project.name}"`, {
+    projectId: project.id,
+    projectName: project.name,
+    homeId: home.id,
+    homeName: home.name,
+  });
   persist();
   return home;
 }
@@ -423,6 +545,11 @@ function updateHome(projectId, homeId, { name }) {
 function deleteHome(projectId, homeId) {
   const { project, home } = getHomeOrThrow(projectId, homeId);
   project.homes = project.homes.filter((h) => h.id !== home.id);
+  // Aftersales tickets live at the project level now — keep the ticket
+  // history, just drop the now-dangling home reference.
+  for (const ticket of project.aftersalesTickets) {
+    if (ticket.homeId === home.id) ticket.homeId = null;
+  }
   project.updatedAt = nowIso();
   persist();
   fs.rmSync(homeDir(projectId, home.id), { recursive: true, force: true });
@@ -438,8 +565,18 @@ function updateHomeCommissioningItem(projectId, homeId, key, patch) {
     err.status = 400;
     throw err;
   }
+  const wasChecked = item.checked;
   if ('checked' in patch) item.checked = !!patch.checked;
   if ('note' in patch) item.note = patch.note;
+  if (!wasChecked && item.checked) {
+    const field = COMMISSIONING_FIELDS.find((f) => f.key === key);
+    logActivity(`"${field ? field.label : key}" completed for "${home.name}" (${project.name})`, {
+      projectId: project.id,
+      projectName: project.name,
+      homeId: home.id,
+      homeName: home.name,
+    });
+  }
   home.updatedAt = nowIso();
   project.updatedAt = nowIso();
   persist();
@@ -504,6 +641,12 @@ function addHomeNote(projectId, homeId, content) {
   const note = pushNote(home.notes, content);
   home.updatedAt = nowIso();
   project.updatedAt = nowIso();
+  logActivity(`Note added on "${home.name}" (${project.name})`, {
+    projectId: project.id,
+    projectName: project.name,
+    homeId: home.id,
+    homeName: home.name,
+  });
   persist();
   return note;
 }
@@ -539,6 +682,12 @@ function addOutstandingItem(projectId, homeId, description) {
   home.outstandingItems.push(item);
   home.updatedAt = nowIso();
   project.updatedAt = nowIso();
+  logActivity(`Outstanding item logged for "${home.name}" (${project.name})`, {
+    projectId: project.id,
+    projectName: project.name,
+    homeId: home.id,
+    homeName: home.name,
+  });
   persist();
   return item;
 }
@@ -610,6 +759,12 @@ function addHomeFile(projectId, homeId, fileMeta) {
   home.files.push(file);
   home.updatedAt = nowIso();
   project.updatedAt = nowIso();
+  logActivity(`File "${file.originalName}" uploaded to "${home.name}" (${project.name})`, {
+    projectId: project.id,
+    projectName: project.name,
+    homeId: home.id,
+    homeName: home.name,
+  });
   persist();
   return file;
 }
@@ -647,6 +802,12 @@ function addHomeHoursEntry(projectId, homeId, patch) {
   const entry = pushHours(home.hoursLog, patch);
   home.updatedAt = nowIso();
   project.updatedAt = nowIso();
+  logActivity(`Hours logged for "${home.name}" (${project.name}) — ${entry.hours} hrs`, {
+    projectId: project.id,
+    projectName: project.name,
+    homeId: home.id,
+    homeName: home.name,
+  });
   persist();
   return entry;
 }
@@ -668,28 +829,67 @@ function deleteHomeHoursEntry(projectId, homeId, entryId) {
   persist();
 }
 
-// ---- Per-home aftersales tickets ----
+// ---- Aftersales tickets (project-level; optionally tied to one Home/Unit) ----
+// Field set and grouping mirror the team's real aftersales spreadsheet:
+// Case Details / Client Details / Issue Details / Communication Records.
+// "Date & Action" there is a running dated log (like Outstanding Items),
+// not a single field, so it's stored as `actions: [{id, date, action}]`.
 
-function addAftersalesTicket(projectId, homeId, { projectRef, issueNotes, actionDate, caseId }) {
-  const { project, home } = getHomeOrThrow(projectId, homeId);
-  const ticket = {
-    id: newId(),
-    projectRef: projectRef || '',
-    issueNotes: issueNotes || '',
-    actionDate: actionDate || null,
-    caseId: caseId || '',
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
-  home.aftersalesTickets.push(ticket);
-  home.updatedAt = nowIso();
+const AFTERSALES_TEXT_FIELDS = [
+  'status',
+  'caseId',
+  'handler',
+  'projectRef',
+  'companyName',
+  'contactName',
+  'email',
+  'phone',
+  'address',
+  'propertyType',
+  'product',
+  'issueType',
+  'summary',
+  'notes',
+  'findings',
+  'resolution',
+  'replacementSN',
+  'faultySN',
+];
+
+function defaultAftersalesTicket() {
+  const ticket = { id: newId(), homeId: null, actions: [], charge: null, createdAt: nowIso(), updatedAt: nowIso() };
+  for (const field of AFTERSALES_TEXT_FIELDS) ticket[field] = '';
+  ticket.status = 'Open';
+  return ticket;
+}
+
+function applyAftersalesPatch(ticket, patch) {
+  for (const field of AFTERSALES_TEXT_FIELDS) {
+    if (field in patch) ticket[field] = patch[field] || '';
+  }
+  if ('charge' in patch) {
+    ticket.charge = patch.charge === '' || patch.charge === null || patch.charge === undefined ? null : Number(patch.charge);
+  }
+}
+
+function addAftersalesTicket(projectId, patch) {
+  const project = assertProject(projectId);
+  const home = patch.homeId ? project.homes.find((h) => h.id === patch.homeId) || null : null;
+  const ticket = defaultAftersalesTicket();
+  ticket.homeId = home ? home.id : null;
+  applyAftersalesPatch(ticket, patch);
+  project.aftersalesTickets.push(ticket);
   project.updatedAt = nowIso();
+  logActivity(
+    `Aftersales ticket${ticket.caseId ? ` ${ticket.caseId}` : ''} logged for "${project.name}"${home ? ` — ${home.name}` : ''}`,
+    { projectId: project.id, projectName: project.name, homeId: home ? home.id : null, homeName: home ? home.name : null }
+  );
   persist();
   return ticket;
 }
 
-function findAftersalesTicket(home, ticketId) {
-  const ticket = home.aftersalesTickets.find((t) => t.id === ticketId);
+function findAftersalesTicket(project, ticketId) {
+  const ticket = project.aftersalesTickets.find((t) => t.id === ticketId);
   if (!ticket) {
     const err = new Error('Aftersales ticket not found');
     err.status = 404;
@@ -698,26 +898,65 @@ function findAftersalesTicket(home, ticketId) {
   return ticket;
 }
 
-function updateAftersalesTicket(projectId, homeId, ticketId, patch) {
-  const { project, home } = getHomeOrThrow(projectId, homeId);
-  const ticket = findAftersalesTicket(home, ticketId);
-  if ('projectRef' in patch) ticket.projectRef = patch.projectRef || '';
-  if ('issueNotes' in patch) ticket.issueNotes = patch.issueNotes || '';
-  if ('actionDate' in patch) ticket.actionDate = patch.actionDate || null;
-  if ('caseId' in patch) ticket.caseId = patch.caseId || '';
+function updateAftersalesTicket(projectId, ticketId, patch) {
+  const project = assertProject(projectId);
+  const ticket = findAftersalesTicket(project, ticketId);
+  if ('homeId' in patch) {
+    const home = patch.homeId ? project.homes.find((h) => h.id === patch.homeId) : null;
+    ticket.homeId = home ? home.id : null;
+  }
+  applyAftersalesPatch(ticket, patch);
   ticket.updatedAt = nowIso();
-  home.updatedAt = nowIso();
   project.updatedAt = nowIso();
   persist();
   return ticket;
 }
 
-function deleteAftersalesTicket(projectId, homeId, ticketId) {
-  const { project, home } = getHomeOrThrow(projectId, homeId);
-  home.aftersalesTickets = home.aftersalesTickets.filter((t) => t.id !== ticketId);
-  home.updatedAt = nowIso();
+function deleteAftersalesTicket(projectId, ticketId) {
+  const project = assertProject(projectId);
+  project.aftersalesTickets = project.aftersalesTickets.filter((t) => t.id !== ticketId);
   project.updatedAt = nowIso();
   persist();
+}
+
+function addAftersalesAction(projectId, ticketId, { date, action }) {
+  const project = assertProject(projectId);
+  const ticket = findAftersalesTicket(project, ticketId);
+  const entry = { id: newId(), date: date || null, action: action || '', createdAt: nowIso() };
+  ticket.actions.push(entry);
+  ticket.actions.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  ticket.updatedAt = nowIso();
+  project.updatedAt = nowIso();
+  persist();
+  return entry;
+}
+
+function deleteAftersalesAction(projectId, ticketId, actionId) {
+  const project = assertProject(projectId);
+  const ticket = findAftersalesTicket(project, ticketId);
+  ticket.actions = ticket.actions.filter((a) => a.id !== actionId);
+  ticket.updatedAt = nowIso();
+  project.updatedAt = nowIso();
+  persist();
+}
+
+// Every ticket, across every project, annotated with project/home names for
+// display — backs the standalone Aftersales table.
+function listAllAftersalesTickets() {
+  const all = [];
+  for (const project of Object.values(db.projects)) {
+    for (const ticket of project.aftersalesTickets) {
+      const home = ticket.homeId ? project.homes.find((h) => h.id === ticket.homeId) : null;
+      all.push({
+        ...ticket,
+        projectId: project.id,
+        projectName: project.name,
+        homeName: home ? home.name : null,
+      });
+    }
+  }
+  all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  return all;
 }
 
 // ---- Backup / restore ----
@@ -769,6 +1008,8 @@ module.exports = {
   load,
   exportBackupBuffer,
   restoreFromBackupBuffer,
+  listRecentActivity,
+  listAllAftersalesTickets,
   listProjects,
   getProject,
   createProject,
@@ -810,6 +1051,8 @@ module.exports = {
   addAftersalesTicket,
   updateAftersalesTicket,
   deleteAftersalesTicket,
+  addAftersalesAction,
+  deleteAftersalesAction,
   homeFilesDir,
   homeChecklistPhotoDir,
 };

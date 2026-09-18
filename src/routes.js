@@ -50,6 +50,7 @@ function projectSummary(project) {
     checklistDone: Object.values(project.checklist).filter((i) => i.checked).length,
     checklistTotal: Object.keys(project.checklist).length,
     homesCount: project.homes.length,
+    homes: project.homes.map((h) => ({ id: h.id, name: h.name })),
     commissioningDone,
     commissioningTotal,
     fileCount: project.files.length,
@@ -145,6 +146,17 @@ function buildApiRouter() {
     }
     store.restoreFromBackupBuffer(req.file.buffer);
     res.json({ ok: true });
+  }));
+
+  // ---- Recent activity (home page feed) ----
+  router.get('/activity', wrap((req, res) => {
+    const limit = Number(req.query.limit) || 10;
+    res.json(store.listRecentActivity(limit));
+  }));
+
+  // ---- Aftersales (global, across every project/home) ----
+  router.get('/aftersales', wrap((req, res) => {
+    res.json(store.listAllAftersalesTickets());
   }));
 
   // ---- Projects ----
@@ -400,19 +412,29 @@ function buildApiRouter() {
     res.status(204).end();
   }));
 
-  // ---- Per-home aftersales tickets ----
-  router.post('/projects/:id/homes/:homeId/aftersales', wrap((req, res) => {
-    const ticket = store.addAftersalesTicket(req.params.id, req.params.homeId, req.body || {});
+  // ---- Aftersales tickets (project-level; homeId in the body is optional) ----
+  router.post('/projects/:id/aftersales', wrap((req, res) => {
+    const ticket = store.addAftersalesTicket(req.params.id, req.body || {});
     res.status(201).json(ticket);
   }));
 
-  router.patch('/projects/:id/homes/:homeId/aftersales/:ticketId', wrap((req, res) => {
-    const ticket = store.updateAftersalesTicket(req.params.id, req.params.homeId, req.params.ticketId, req.body || {});
+  router.patch('/projects/:id/aftersales/:ticketId', wrap((req, res) => {
+    const ticket = store.updateAftersalesTicket(req.params.id, req.params.ticketId, req.body || {});
     res.json(ticket);
   }));
 
-  router.delete('/projects/:id/homes/:homeId/aftersales/:ticketId', wrap((req, res) => {
-    store.deleteAftersalesTicket(req.params.id, req.params.homeId, req.params.ticketId);
+  router.delete('/projects/:id/aftersales/:ticketId', wrap((req, res) => {
+    store.deleteAftersalesTicket(req.params.id, req.params.ticketId);
+    res.status(204).end();
+  }));
+
+  router.post('/projects/:id/aftersales/:ticketId/actions', wrap((req, res) => {
+    const action = store.addAftersalesAction(req.params.id, req.params.ticketId, req.body || {});
+    res.status(201).json(action);
+  }));
+
+  router.delete('/projects/:id/aftersales/:ticketId/actions/:actionId', wrap((req, res) => {
+    store.deleteAftersalesAction(req.params.id, req.params.ticketId, req.params.actionId);
     res.status(204).end();
   }));
 

@@ -53,8 +53,10 @@ function loadHtmlWithBase(filename) {
   return raw.replace('<head>', `<head>\n  ${baseTag}`);
 }
 const loginHtml = loadHtmlWithBase('login.html');
+const homeHtml = loadHtmlWithBase('home.html');
 const indexHtml = loadHtmlWithBase('index.html');
 const projectHtml = loadHtmlWithBase('project.html');
+const aftersalesHtml = loadHtmlWithBase('aftersales.html');
 
 const router = express.Router();
 
@@ -77,10 +79,16 @@ router.use(requireAuth);
 router.use('/api', buildApiRouter());
 
 router.get('/', (req, res) => {
+  res.type('html').send(homeHtml);
+});
+router.get('/projects', (req, res) => {
   res.type('html').send(indexHtml);
 });
 router.get('/project/:id', (req, res) => {
   res.type('html').send(projectHtml);
+});
+router.get('/aftersales', (req, res) => {
+  res.type('html').send(aftersalesHtml);
 });
 
 if (BASE_PATH) {
@@ -97,5 +105,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Konec Project Management running on port ${PORT}${BASE_PATH ? ` (base path ${BASE_PATH})` : ''}`);
+  console.log(`Konec Job Manager running on port ${PORT}${BASE_PATH ? ` (base path ${BASE_PATH})` : ''}`);
 });

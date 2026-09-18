@@ -3,24 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Konec Project Management</title>
+  <title>Project Manager — Konec Job Manager</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <img src="img/logo.png" alt="Konec" class="brand-logo" />
-      <span class="brand-sub">Project Management</span>
+      <span class="brand-sub">Job Manager</span>
     </div>
     <div class="topbar-actions">
-      <a href="api/backup" class="btn btn-sm btn-backup" download>Download Backup</a>
-      <button id="restoreBackupBtn" class="btn btn-sm btn-backup">Restore Backup</button>
-      <input type="file" id="restoreFileInput" accept=".zip" class="hidden" />
       <form method="POST" action="logout">
         <button type="submit" class="btn btn-sm btn-outline-backup">Log out</button>
       </form>
     </div>
   </header>
+
+  <nav class="main-nav">
+    <a href="." class="nav-link">Home</a>
+    <a href="projects" class="nav-link active">Project Manager</a>
+    <a href="aftersales" class="nav-link">Aftersales</a>
+  </nav>
 
   <main class="container">
     <div class="page-header">

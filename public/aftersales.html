@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aftersales — Konec Job Manager</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="img/logo.png" alt="Konec" class="brand-logo" />
+      <span class="brand-sub">Job Manager</span>
+    </div>
+    <div class="topbar-actions">
+      <form method="POST" action="logout">
+        <button type="submit" class="btn btn-sm btn-outline-backup">Log out</button>
+      </form>
+    </div>
+  </header>
+
+  <nav class="main-nav">
+    <a href="." class="nav-link">Home</a>
+    <a href="projects" class="nav-link">Project Manager</a>
+    <a href="aftersales" class="nav-link active">Aftersales</a>
+  </nav>
+
+  <main class="container">
+    <div class="page-header">
+      <h1>Aftersales</h1>
+      <button id="newTicketBtn" class="btn btn-accent">+ New Case</button>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" id="searchInput" placeholder="Search by case ID, company, contact, product…" />
+    </div>
+
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Case ID</th>
+            <th>Handler</th>
+            <th>Project</th>
+            <th>Unit</th>
+            <th>Company / Contact</th>
+            <th>Product</th>
+            <th>Issue Type</th>
+            <th>Findings</th>
+            <th>Charge</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody id="aftersalesTableBody"></tbody>
+      </table>
+    </div>
+    <div id="aftersalesEmptyState" class="empty-state hidden">No aftersales cases yet.</div>
+  </main>
+
+  <div id="caseModal" class="modal-backdrop hidden">
+    <div class="modal modal-wide">
+      <h2 id="caseModalTitle">New Aftersales Case</h2>
+      <form id="caseForm">
+        <div class="field-group">
+          <div class="field-group-title">Link to Job</div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="caseProjectSelect">Project</label>
+              <select id="caseProjectSelect" required>
+                <option value="">Select a project…</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="caseHomeSelect">Unit / Home (if applicable)</label>
+              <select id="caseHomeSelect">
+                <option value="">Not applicable</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-group-title">Case Details</div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="caseStatus">Status</label>
+              <select id="caseStatus">
+                <option>Open</option>
+                <option>In Progress</option>
+                <option>Awaiting Customer</option>
+                <option>Awaiting Parts</option>
+                <option>Complete</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="caseId">Case ID</label>
+              <div style="display:flex; gap:8px;">
+                <input type="text" id="caseId" style="flex:1;" />
+                <button type="button" id="generateCaseIdBtn" class="btn btn-sm">Generate</button>
+              </div>
+            </div>
+            <div class="field field-full">
+              <label for="caseHandler">AFS Handler</label>
+              <input type="text" id="caseHandler" placeholder="Who's handling this case" />
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-group-title">Client Details</div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="caseProjectRef">Project / Customer ID</label>
+              <input type="text" id="caseProjectRef" placeholder="Auto-filled from the selected project" />
+            </div>
+            <div class="field">
+              <label for="casePropertyType">Property Type</label>
+              <select id="casePropertyType">
+                <option value="">—</option>
+                <option>House</option>
+                <option>Apartment/Unit</option>
+                <option>Townhouse</option>
+                <option>Commercial</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="caseCompanyName">Company Name</label>
+              <input type="text" id="caseCompanyName" />
+            </div>
+            <div class="field">
+              <label for="caseContactName">Contact Name</label>
+              <input type="text" id="caseContactName" />
+            </div>
+            <div class="field">
+              <label for="caseEmail">Email</label>
+              <input type="text" id="caseEmail" />
+            </div>
+            <div class="field">
+              <label for="casePhone">Phone</label>
+              <input type="text" id="casePhone" />
+            </div>
+            <div class="field field-full">
+              <label for="caseAddress">Address</label>
+              <input type="text" id="caseAddress" />
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-group-title">Issue Details</div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="caseProduct">Product</label>
+              <input type="text" id="caseProduct" placeholder="Model / SKU" />
+            </div>
+            <div class="field">
+              <label for="caseIssueType">Issue Type</label>
+              <select id="caseIssueType">
+                <option value="">—</option>
+                <option>Hardware</option>
+                <option>Software</option>
+                <option>Installation</option>
+                <option>General Enquiry</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field field-full">
+              <label for="caseSummary">Summary</label>
+              <textarea id="caseSummary" rows="2" placeholder="What's wrong with the device?"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-group-title">Communication Records</div>
+
+          <div class="field">
+            <label>Date &amp; Action Log</label>
+            <div id="caseActionsList" class="file-list" style="margin-bottom:10px;"></div>
+            <div id="caseActionsNewHint" class="empty-state" style="padding:10px; font-size:12.5px;">
+              Save the case first to start logging dated actions.
+            </div>
+            <div id="caseActionsAddRow" class="hidden" style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+              <div style="flex:none; width:150px;">
+                <label>Date</label>
+                <input type="date" id="caseActionDate" />
+              </div>
+              <div style="flex:1; min-width:160px;">
+                <label>Action</label>
+                <input type="text" id="caseActionText" placeholder="What happened…" />
+              </div>
+              <button type="button" id="addCaseActionBtn" class="btn btn-sm btn-accent">Add</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="caseNotes">Notes</label>
+            <textarea id="caseNotes" rows="2" placeholder="Ongoing internal notes…"></textarea>
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label for="caseFindings">Findings</label>
+              <input type="text" id="caseFindings" list="findingsOptions" placeholder="e.g. NFF, OOW…" />
+              <datalist id="findingsOptions">
+                <option value="NFF"></option>
+                <option value="OOW"></option>
+                <option value="DOA"></option>
+                <option value="Confirmed Fault"></option>
+              </datalist>
+            </div>
+            <div class="field">
+              <label for="caseResolution">Resolution</label>
+              <input type="text" id="caseResolution" list="resolutionOptions" placeholder="e.g. Replaced, TBS…" />
+              <datalist id="resolutionOptions">
+                <option value="TBS"></option>
+                <option value="Replaced"></option>
+                <option value="Repaired"></option>
+                <option value="Refunded"></option>
+                <option value="General Enquiry"></option>
+              </datalist>
+            </div>
+            <div class="field">
+              <label for="caseReplacementSN">Replacement SN</label>
+              <input type="text" id="caseReplacementSN" />
+            </div>
+            <div class="field">
+              <label for="caseFaultySN">Faulty Device SN</label>
+              <input type="text" id="caseFaultySN" />
+            </div>
+            <div class="field">
+              <label for="caseCharge">Charge ($)</label>
+              <input type="number" step="0.01" min="0" id="caseCharge" placeholder="0.00" />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn" id="cancelCaseBtn">Cancel</button>
+          <button type="submit" class="btn btn-accent" id="saveCaseBtn">Create Case</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/common.js"></script>
+  <script src="js/aftersales.js"></script>
+</body>
+</html>

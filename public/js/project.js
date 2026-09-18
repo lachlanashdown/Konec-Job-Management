@@ -48,7 +48,7 @@ function showHint(itemEl) {
 
 async function loadProject() {
   project = await apiFetch(`api/projects/${projectId}`);
-  document.title = `${project.name} — Konec Project Management`;
+  document.title = `${project.name} — Konec Job Manager`;
   projectNameInput.value = project.name;
   commissionDateInput.value = project.commissionDate || '';
   konecLinkIdInput.value = project.konecLinkId || '';
@@ -266,7 +266,7 @@ document.getElementById('renameHomeBtn').addEventListener('click', async () => {
 document.getElementById('deleteHomeBtn').addEventListener('click', async () => {
   const home = getCurrentHome();
   if (!home) return;
-  if (!confirm(`Delete "${home.name}"? This removes its checklist, notes, files, hours and aftersales tickets permanently.`)) return;
+  if (!confirm(`Delete "${home.name}"? This removes its checklist, notes, files and hours permanently. Any aftersales tickets logged against it are kept but unlinked.`)) return;
   await apiFetch(`api/projects/${projectId}/homes/${home.id}`, { method: 'DELETE' });
   project.homes = project.homes.filter((h) => h.id !== home.id);
   currentHomeId = null;
@@ -742,85 +742,73 @@ function renderHoursByHome() {
   hoursByHomeEl.innerHTML = `<div style="font-size:12.5px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:8px;">By Home/Unit</div>${rows}`;
 }
 
-// ---------- Per-home aftersales tickets ----------
+// ---------- Aftersales tickets (project-level; homeId optional) ----------
+// Full case management (all fields, dated action log) lives on the
+// dedicated Aftersales page — these in-project views are read-only summaries
+// that link out to it, rather than duplicating a ~20-field form here.
 
-const aftersalesListEl = document.getElementById('aftersalesList');
+const AFTERSALES_STATUS_BADGE = {
+  Open: 'badge-neutral',
+  'In Progress': 'badge-blue',
+  'Awaiting Customer': 'badge-amber',
+  'Awaiting Parts': 'badge-orange',
+  Complete: 'badge-green',
+};
 
-function aftersalesTicketTemplate(ticket) {
+function statusBadgeHtml(status) {
+  const cls = AFTERSALES_STATUS_BADGE[status] || 'badge-neutral';
+  return `<span class="badge ${cls}">${escapeHtml(status || 'Open')}</span>`;
+}
+
+function aftersalesSummaryTemplate(ticket) {
+  const contact = [ticket.companyName, ticket.contactName].filter(Boolean).join(' / ');
   return `
-    <div class="note-item" data-id="${ticket.id}">
+    <div class="note-item">
       <div class="note-meta">
-        <span>${formatDate(ticket.actionDate)}${ticket.caseId ? ' · Case ' + escapeHtml(ticket.caseId) : ''}</span>
-        <button class="btn btn-sm btn-danger" data-action="delete-aftersales">Delete</button>
+        <span>${statusBadgeHtml(ticket.status)} ${ticket.caseId ? escapeHtml(ticket.caseId) : ''}</span>
+        <a class="btn btn-sm" href="aftersales?ticketId=${ticket.id}">Open</a>
       </div>
-      <div style="font-size:13px; color:var(--text-muted); margin-bottom:6px;">Project ID: ${ticket.projectRef ? escapeHtml(ticket.projectRef) : '—'}</div>
-      <div class="note-content" style="white-space:pre-wrap;">${escapeHtml(ticket.issueNotes)}</div>
+      <div style="font-size:13px; color:var(--text-muted); margin-bottom:6px;">${contact || '—'}${ticket.product ? ' · ' + escapeHtml(ticket.product) : ''}</div>
+      <div class="note-content" style="white-space:pre-wrap;">${escapeHtml(ticket.summary)}</div>
     </div>
   `;
 }
 
+const aftersalesListEl = document.getElementById('aftersalesList');
+const newCaseForHomeLink = document.getElementById('newCaseForHomeLink');
+
 function renderAftersalesTickets() {
-  const home = getCurrentHome();
-  aftersalesListEl.innerHTML = home.aftersalesTickets.length
-    ? home.aftersalesTickets.slice().reverse().map(aftersalesTicketTemplate).join('')
+  const tickets = project.aftersalesTickets.filter((t) => t.homeId === currentHomeId);
+  aftersalesListEl.innerHTML = tickets.length
+    ? tickets.slice().reverse().map(aftersalesSummaryTemplate).join('')
     : '<div class="empty-state">No aftersales tickets yet.</div>';
+  newCaseForHomeLink.href = `aftersales?projectId=${projectId}&homeId=${currentHomeId || ''}`;
 }
-
-document.getElementById('addAftersalesBtn').addEventListener('click', async () => {
-  const projectRef = document.getElementById('aftersalesProjectRef').value.trim();
-  const caseId = document.getElementById('aftersalesCaseId').value.trim();
-  const actionDate = document.getElementById('aftersalesActionDate').value || null;
-  const issueNotes = document.getElementById('aftersalesIssueNotes').value.trim();
-  if (!issueNotes) return;
-  await apiFetch(`api/projects/${projectId}/homes/${currentHomeId}/aftersales`, {
-    method: 'POST',
-    body: JSON.stringify({ projectRef, caseId, actionDate, issueNotes }),
-  });
-  document.getElementById('aftersalesProjectRef').value = '';
-  document.getElementById('aftersalesCaseId').value = '';
-  document.getElementById('aftersalesActionDate').value = '';
-  document.getElementById('aftersalesIssueNotes').value = '';
-  project = await apiFetch(`api/projects/${projectId}`);
-  renderAftersalesTickets();
-  renderAftersalesOverview();
-});
-
-aftersalesListEl.addEventListener('click', async (e) => {
-  if (e.target.dataset.action !== 'delete-aftersales') return;
-  const rowEl = e.target.closest('.note-item');
-  if (!confirm('Delete this aftersales ticket?')) return;
-  await apiFetch(`api/projects/${projectId}/homes/${currentHomeId}/aftersales/${rowEl.dataset.id}`, { method: 'DELETE' });
-  project = await apiFetch(`api/projects/${projectId}`);
-  renderAftersalesTickets();
-  renderAftersalesOverview();
-});
 
 // ---------- Project-level aftersales rollup (every home, clearly labelled) ----------
 
 function renderAftersalesOverview() {
   const countEl = document.getElementById('aftersalesOverviewCount');
   const listEl = document.getElementById('aftersalesOverviewList');
-  const all = [];
-  for (const home of project.homes) {
-    for (const ticket of home.aftersalesTickets) {
-      all.push({ ...ticket, homeName: home.name });
-    }
-  }
-  all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const all = project.aftersalesTickets
+    .map((t) => ({ ...t, homeName: t.homeId ? (project.homes.find((h) => h.id === t.homeId) || {}).name : null }))
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   countEl.textContent = `${all.length} ticket${all.length === 1 ? '' : 's'}`;
   listEl.innerHTML = all.length
     ? all
-        .map(
-          (t) => `
+        .map((t) => {
+          const contact = [t.companyName, t.contactName].filter(Boolean).join(' / ');
+          return `
             <div class="note-item">
               <div class="note-meta">
-                <span><strong style="color:var(--accent);">${escapeHtml(t.homeName)}</strong> · ${formatDate(t.actionDate)}${t.caseId ? ' · Case ' + escapeHtml(t.caseId) : ''}</span>
+                <span>${statusBadgeHtml(t.status)} ${t.homeName ? `<strong style="color:var(--accent);">${escapeHtml(t.homeName)}</strong> · ` : ''}${t.caseId ? escapeHtml(t.caseId) : ''}</span>
+                <a class="btn btn-sm" href="aftersales?ticketId=${t.id}">Open</a>
               </div>
-              <div style="font-size:13px; color:var(--text-muted); margin-bottom:6px;">Project ID: ${t.projectRef ? escapeHtml(t.projectRef) : '—'}</div>
-              <div class="note-content" style="white-space:pre-wrap;">${escapeHtml(t.issueNotes)}</div>
+              <div style="font-size:13px; color:var(--text-muted); margin-bottom:6px;">${contact || '—'}${t.product ? ' · ' + escapeHtml(t.product) : ''}</div>
+              <div class="note-content" style="white-space:pre-wrap;">${escapeHtml(t.summary)}</div>
             </div>
-          `
-        )
+          `;
+        })
         .join('')
     : '<div class="empty-state">No aftersales tickets yet.</div>';
 }
